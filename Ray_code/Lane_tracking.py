@@ -1,33 +1,47 @@
 import cv2 as cv
 import numpy as np
+import matplotlib.pyplot as plt
 
-class lane_detecting:
-    def __init__(self, img):
-        self.img = img
+def canny(image):
+    gray = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+    blur = cv.GaussianBlur(gray, (5, 5) , 0)
+    edge = cv.Canny(blur, 150, 200)
+    return edge
 
-    def lane_gray_edge(self):
-        lane_gray = cv.cvtColor(self.img, cv.COLOR_BGR2GRAY)
-        lane_blur = cv.GaussianBlur(lane_gray, (5, 5), 0)
-        lane_edge = cv.Canny(lane_blur, 100, 200)
-        return lane_edge
+def region_of_interest(image): ##做一個梯形的遮罩
+    hei = image.shape[0]
+    wid = image.shape[1]
+
+    triangle = np.array([(0, hei), 
+                        # np.int32((wid / 2, (2 * hei) / 5)), 
+                        (300, 480),
+                        (600, 460),
+                        (wid, hei)])
     
-    def lane_mask_edge(self, h_min, h_max, s_min, s_max, v_min, v_max):
-        lane_hsv = cv.cvtColor(self.img, cv.COLOR_BGR2HSV)
-        
-        lower = np.array([h_min, s_min, v_min])
-        upper = np.array([h_max, s_max, v_max])
-
-        mask = cv.inRange(lane_hsv, lower, upper)
-        result = cv.bitwise_and(self.img, self.img, mask = mask)
-        return result
+    mask = np.zeros_like(image)
+    mask = cv.fillPoly(mask, [triangle], (255, 255, 255))
     
-lane = cv.imread('Lane.jpg')
-lane = cv.GaussianBlur(lane, (5, 5), 0)
-image = lane_detecting(lane)
-res = image.lane_mask_edge(0, 179, 0, 255, 0, 255)
+    mask_image = cv.bitwise_and(image, mask)
+    return mask_image
 
-cv.imshow('lane edge', image.lane_gray_edge())
-cv.imshow('lane mask', res)
+def display_lines(image, lines):
+    line_image = np.zeros_like(image)
+    if lines is not None:
+        for line in lines:
+            x1, x2, y1, y2, = line[0]
+            cv.line(line_image, (x1, y1), (x2, y2), 255, 2) 
+
+    return line_image
+
+img = cv.imread('Lane.jpg')
+img_canny = canny(img)
+img_mask = region_of_interest(img_canny)
+
+lines = cv.HoughLinesP(img_mask, 1.0, np.pi/180, 100, np.array([]), minLineLength = 10, maxLineGap = 1) #image, rho, theta, threshod, lines
+line_img = display_lines(img, lines)
+
+cv.imshow('test', line_img)
+cv.imshow('hi', img_mask)
 cv.waitKey(0)
-
-
+# plt.imshow(img_canny)
+# plt.show()
