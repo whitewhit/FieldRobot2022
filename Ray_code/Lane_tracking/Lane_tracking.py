@@ -1,4 +1,3 @@
-from inspect import Parameter
 import cv2 as cv
 import numpy as np
 
@@ -27,7 +26,8 @@ def region_of_interest(image): ##做一個梯形的遮罩
 def display_lines(image, lines):
     line_image = np.zeros_like(image)
     if lines is not None:
-        for  x1, y1, x2, y2 in lines:
+        for line in lines:
+            x1, y1, x2, y2 = line.reshape(4)
             cv.line(line_image, (x1, y1), (x2, y2), 255, 2) 
 
     return line_image
@@ -66,11 +66,14 @@ img_canny = canny(img)
 img_mask = region_of_interest(img_canny)
 
 lines = cv.HoughLinesP(img_mask, 1.0, np.pi/180, 100, np.array([]), minLineLength = 10, maxLineGap = 100) #image, rho, theta, threshod, lines
+line_img = display_lines(img, lines)
 average_lines = average_slope_intercept(img_copy, lines)
-line_img = display_lines(img, average_lines)
-combo_img = cv.addWeighted(img_copy, 0.8, line_img, 1, 1)
+line2_img = display_lines(img, average_lines)
+combo_img = cv.addWeighted(img_copy, 0.8, line2_img, 1, 1)
+print(img.shape)
 
 cv.imshow('test', line_img)
+cv.imshow('test2', line2_img)
 cv.imshow('hi', img_mask)
 cv.imshow('combo', combo_img)
 cv.waitKey(0)
