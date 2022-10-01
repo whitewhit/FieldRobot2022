@@ -1,8 +1,8 @@
 import cv2 as cv
 import numpy as np
 
-lane = cv.imread('Ray_code0.jpg')
-# lane = cv.resize(lane, (0, 0), fx = 0.25, fy = 0.25)
+lane = cv.imread('Ray_code1.jpg')
+lane = cv.resize(lane, (0, 0), fx = 0.25, fy = 0.25)
 hsv = cv.cvtColor(lane, cv.COLOR_BGR2HSV)
 
 def empty(v):
