@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
-import white_blance as wb
+import PID_control as pid
+
+A = pid.PID(0.1, 0.1, 0.4)
 
 def HSV_mask(img, hsv):
     img_hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
@@ -16,61 +18,76 @@ def find_direction(img, img2):
     contours, hierarchy = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
     total_cx = 0
     total_cy = 0
+    count = 0
     for cnt in contours:
         area = cv.contourArea(cnt)
-        if area > 100:
+        if area > 50:
             M = cv.moments(cnt)
             cX = int(M["m10"] / M["m00"])
             cY = int(M["m01"] / M["m00"])
-        
             total_cx += cX
             total_cy += cY
-
-            # cv.circle(img2, (cX, cY), 10, (1, 227, 254), -1)
+            count += 1
+            cv.circle(img2, (cX, cY), 10, (1, 227, 254), -1)
             cv.drawContours(img2, cnt, -1, (0, 255, 0), 2)
 
-    lane_cx = total_cx/2
-    lane_cy = total_cy/2
-
-    if lane_cx > int(img.shape[0]/2):
-        print('turn right')
-    elif lane_cx < int(img.shape[0]/2):
-        print('turn left')
-    else:
-        print('go straghit')
+    lane_cx = total_cx/count
+    lane_cy = total_cy/count
     
-    # cv.circle(img2, (int(lane_cx), int(lane_cy)), 10, (0, 0, 254), -1)
+    if lane_cx < int(img.shape[1]/2):
+        a = A.update(int(img.shape[1]/2) - lane_cx)
+        print('feedback = ',  a, 'Turn right')
+    elif lane_cx > int(img.shape[1]/2):
+        b = A.update(int(img.shape[1]/2) - lane_cx)
+        print('feedback = ',  b, 'Turn left')
+    
+    cv.circle(img2, (int(lane_cx), int(lane_cy)), 10, (0, 0, 255), -1)
     return img2
 
-hsv = [13, 28, 60, 160, 178, 255]
+def region_of_interest(image,x,y): 
+    hei = image.shape[0]
+    wid = image.shape[1]
 
-img = cv.imread('Ray_code0.jpg')
-img_blur = cv.GaussianBlur(img,(5, 5), 0)
+    triangle = np.array([np.int32((0, hei*y)), 
+                        # np.int32((wid / 2, (2 * hei) / 5)), 
+                        np.int32((wid, hei*y)),
+                        np.int32((wid, hei)),
+                        np.int32((0, hei))])
+    
+    mask = np.zeros_like(image)
+    mask = cv.fillPoly(mask, [triangle], (255, 255, 255))
+    
+    mask_image = cv.bitwise_and(image, mask)
+    return mask_image
 
-img_masked = HSV_mask(img_blur, hsv)
-img_cnt = find_direction(img_masked, img_blur)
+# hsv = [40, 53, 60, 255, 30, 70] #for camera
+hsv = [0, 179, 0, 73, 0, 110] #for phone camera
 
-cv.imshow('result1', img_masked)
-cv.imshow('result2', img_cnt)
+cap = cv.VideoCapture('20220908_205918.mp4')
+# cap = cv.VideoCapture('20220908_205946.mp4')
+while True:
+    ret, frame = cap.read()
+    if ret:
+        # frame = wb.white_balance_3(frame)
+        frame = cv.resize(frame,(0, 0), fx = 0.25, fy = 0.25)
+        img_blur = cv.GaussianBlur(frame, (5, 5), 0)
+        img_mask = HSV_mask(img_blur, hsv)
+        img_roi = region_of_interest(img_mask,1,2/3)
+        img_dilate = cv.dilate(img_roi,(5,5),iterations = 1) 
+        img_cnt = find_direction(img_dilate, img_blur)
 
-cv.waitKey(0)
+        cv.imshow('result1', img_mask)
+        cv.imshow('hi', img_dilate)
+        cv.imshow('result2', img_cnt) 
+    
+    else:
+        break
 
-# cap = cv.VideoCapture(0)
-# while True:
-#     ret, frame = cap.read()
-#     if ret:
-#         # frame = wb.white_balance_3(frame)
-#         img_blur = cv.GaussianBlur(frame, (5, 5), 0)
-#         img_masked = HSV_mask(img_blur, hsv)
-#         img_cnt = find_edge(img_masked, img_blur)
+    if cv.waitKey(27) & 0xFF == ord('q'):
+        break 
 
-#         cv.imshow('video', img_cnt)
-
-#     if cv.waitKey(27) & 0xFF == ord('q'):
-#         break 
-
-#     cv.waitKey(1)
+    cv.waitKey(100)
 
 
-# cap.release()
-# cv.destroyAllWindows()
+cap.release()
+cv.destroyAllWindows()
